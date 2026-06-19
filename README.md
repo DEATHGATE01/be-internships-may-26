@@ -3,6 +3,7 @@
 Build a minimal production-leaning service that can **handle load**, **rate limit**, and **avoid duplicates** via idempotency.
 
 ## Endpoints (to keep)
+
 - `POST /v1/signals`
   - body: `{ "userId": "string", "type": "string", "payload": "string" }`
   - headers: `X-API-Key`, `Idempotency-Key` (optional)
@@ -13,6 +14,7 @@ Build a minimal production-leaning service that can **handle load**, **rate limi
 - `GET /healthz`
 
 ## Your Tasks
+
 1. **Implement a robust rate limiter** in `src/rateLimit.js`.
 2. **Make idempotency safe across scale** in `src/signals.js`.
 3. **Handle DB failure** gracefully with retry/backoff.
@@ -20,8 +22,10 @@ Build a minimal production-leaning service that can **handle load**, **rate limi
 5. **Finish the tests** in `tests/*.test.js`.
 
 ## Deliverables
+
 - Working service, passing tests, updated README, SCALE.md.
 - Optional deploy link.
+
 ---
 
 ## Extra Production Constraints (must pass)
