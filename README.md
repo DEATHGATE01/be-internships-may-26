@@ -1,60 +1,34 @@
 # Signals Challenge (Node.js + Fastify)
 
-A minimal production-leaning service that handles load, enforces per-user rate limits, and avoids duplicate writes via idempotency keys.
+Build a minimal production-leaning service that can **handle load**, **rate limit**, and **avoid duplicates** via idempotency.
 
-## Getting Started
+## Endpoints (to keep)
+- `POST /v1/signals`
+  - body: `{ "userId": "string", "type": "string", "payload": "string" }`
+  - headers: `X-API-Key`, `Idempotency-Key` (optional)
+  - behaviors:
+    - **Rate limit** per `userId`: `RATE_LIMIT_PER_MIN` per minute (default 5).
+    - **Idempotency**: same `Idempotency-Key` should not create duplicates.
+- `GET /v1/signals?userId=...&limit=...`
+- `GET /healthz`
 
-```bash
-cp .env.example .env
-npm install
-npm run dev
-```
+## Your Tasks
+1. **Implement a robust rate limiter** in `src/rateLimit.js`.
+2. **Make idempotency safe across scale** in `src/signals.js`.
+3. **Handle DB failure** gracefully with retry/backoff.
+4. **Think for 10k RPS.** Add a `SCALE.md`.
+5. **Finish the tests** in `tests/*.test.js`.
 
-The server starts on `http://localhost:8080` by default.
+## Deliverables
+- Working service, passing tests, updated README, SCALE.md.
+- Optional deploy link.
+---
 
-## Endpoints
+## Extra Production Constraints (must pass)
 
-### POST /v1/signals
+- **Atomic Idempotency:** Survive concurrent requests and restarts. Avoid check-then-insert races; use a DB-level unique constraint or atomic upsert pattern. Return the same resource for identical `Idempotency-Key`.
+- **Concurrency-Safe Rate Limit:** Must behave correctly under burst and parallel calls. Naive in-memory counters that race will fail hidden checks. Explain how this becomes multi-instance safe.
+- **Transient DB Failures:** Implement retry/backoff (with jitter) or circuit breaker when DB errors occur (we simulate via `DB_FAIL_RATE`). No duplicates on retry.
+- **Scale Plan (10k RPS):** Fill `SCALE.md` with a clear, concise approach (indexes, pooling, caching, queues, horizontal scale, idempotency store).
 
-Creates a new signal.
-
-- **Headers**: `X-API-Key` (required), `Idempotency-Key` (optional)
-- **Body**: `{ "userId": "string", "type": "string", "payload": "string" }`
-- Rate limited per `userId` (default 5 requests/min, configurable via `RATE_LIMIT_PER_MIN`)
-- If an `Idempotency-Key` is provided, sending the same key again returns the original resource instead of creating a duplicate.
-
-### GET /v1/signals?userId=...&limit=...
-
-Returns signals for a given user, ordered by most recent. `limit` defaults to 20, max 100.
-
-### GET /healthz
-
-Returns `{ "ok": true }`.
-
-## How It Works
-
-**Rate Limiting** — Uses a SQLite-backed sliding window counter (atomic upsert). Each `userId` gets a row that tracks the window start and request count. This avoids race conditions that in-memory maps would have under concurrency.
-
-**Idempotency** — The `idempotency_key` column has a UNIQUE constraint. If two concurrent requests try to insert the same key, one wins and the other catches the constraint violation and returns the existing row. No check-then-insert race.
-
-**Retry / Backoff** — All DB operations are wrapped in a retry loop with exponential backoff and jitter. The `DB_FAIL_RATE` env var simulates transient failures for testing.
-
-## Environment Variables
-
-| Variable | Default | Description |
-|---|---|---|
-| `API_KEY` | `change-me` | API key for auth |
-| `PORT` | `8080` | Server port |
-| `DATABASE_URL` | `./data/signals.db` | SQLite DB path |
-| `RATE_LIMIT_PER_MIN` | `5` | Max requests per user per minute |
-| `DB_FAIL_RATE` | `0` | Simulated DB failure rate (0-1) |
-
-## Running Tests
-
-```bash
-node --test
-```
-
-## Scaling
-
-See [SCALE.md](./SCALE.md) for the approach to handle 10k RPS.
+> We will run additional **hidden concurrency/multi-instance tests** during evaluation.
