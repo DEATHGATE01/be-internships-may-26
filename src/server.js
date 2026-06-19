@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import { postSignal, getSignals } from "./signals.js";
 
 dotenv.config();
+
 const API_KEY = process.env.API_KEY || "change-me";
 const PORT = Number(process.env.PORT || 8080);
 
@@ -20,7 +21,7 @@ app.get("/healthz", async () => ({ ok: true }));
 app.post("/v1/signals", postSignal);
 app.get("/v1/signals", getSignals);
 
-app.listen({ host: "0.0.0.0", port: PORT }).catch((e) => {
-  app.log.error(e);
+app.listen({ host: "0.0.0.0", port: PORT }).catch((err) => {
+  app.log.error(err);
   process.exit(1);
 });

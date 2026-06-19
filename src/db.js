@@ -6,7 +6,6 @@ const dbPath = process.env.DATABASE_URL || "./data/signals.db";
 fs.mkdirSync(path.dirname(dbPath), { recursive: true });
 const db = new Database(dbPath);
 
-// schema
 db.exec(`
 CREATE TABLE IF NOT EXISTS signals (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -25,7 +24,6 @@ CREATE TABLE IF NOT EXISTS rate_limits (
 );
 `);
 
-// failure simulation
 function maybeFail() {
   const rate = Number(process.env.DB_FAIL_RATE || 0);
   if (rate > 0 && Math.random() < rate) {
@@ -38,36 +36,40 @@ function maybeFail() {
 export function insertSignal(userId, type, payload, idemKey, nowMs) {
   maybeFail();
   const stmt = db.prepare(
-    "INSERT INTO signals (user_id, type, payload, idempotency_key, created_at) VALUES (?,?,?,?,?)",
+    "INSERT INTO signals (user_id, type, payload, idempotency_key, created_at) VALUES (?,?,?,?,?)"
   );
   return stmt.run(userId, type, String(payload), idemKey || null, nowMs);
 }
 
 export function getByIdemKey(idemKey) {
   maybeFail();
-  const stmt = db.prepare(
-    "SELECT id, user_id as userId, type, payload, idempotency_key as idempotencyKey, created_at as createdAt FROM signals WHERE idempotency_key = ?",
-  );
-  return stmt.get(idemKey);
+  return db
+    .prepare(
+      "SELECT id, user_id as userId, type, payload, idempotency_key as idempotencyKey, created_at as createdAt FROM signals WHERE idempotency_key = ?"
+    )
+    .get(idemKey);
 }
 
 export function listSignals(userId, limit) {
   maybeFail();
-  const stmt = db.prepare(
-    "SELECT id, user_id as userId, type, payload, idempotency_key as idempotencyKey, created_at as createdAt FROM signals WHERE user_id = ? ORDER BY created_at DESC LIMIT ?",
-  );
-  return stmt.all(userId, limit);
+  return db
+    .prepare(
+      "SELECT id, user_id as userId, type, payload, idempotency_key as idempotencyKey, created_at as createdAt FROM signals WHERE user_id = ? ORDER BY created_at DESC LIMIT ?"
+    )
+    .all(userId, limit);
 }
 
 export function checkRateLimit(userId, rateLimit, windowMs, nowMs) {
   maybeFail();
-  const stmt = db.prepare(`
-    INSERT INTO rate_limits (user_id, window_start, count)
-    VALUES (@userId, @nowMs, 1)
-    ON CONFLICT(user_id) DO UPDATE SET
-      count = CASE WHEN window_start >= @windowStart THEN count + 1 ELSE 1 END,
-      window_start = CASE WHEN window_start >= @windowStart THEN window_start ELSE @nowMs END
-    RETURNING count, window_start
-  `);
-  return stmt.get({ userId, nowMs, windowStart: nowMs - windowMs });
+  const windowStart = nowMs - windowMs;
+  return db
+    .prepare(
+      `INSERT INTO rate_limits (user_id, window_start, count)
+       VALUES (@userId, @nowMs, 1)
+       ON CONFLICT(user_id) DO UPDATE SET
+         count = CASE WHEN window_start >= @windowStart THEN count + 1 ELSE 1 END,
+         window_start = CASE WHEN window_start >= @windowStart THEN window_start ELSE @nowMs END
+       RETURNING count, window_start`
+    )
+    .get({ userId, nowMs, windowStart });
 }
